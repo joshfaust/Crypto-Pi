@@ -37,25 +37,15 @@ def get_coin_data() -> List[Dict]:
 
 def write_to_display() -> None:
     display = TickerDisplay()
-    
-    # Test data
-    tickers = get_coin_data()
-    
+        
     try:
         while True:
-            display.clear()
+            tickers = get_coin_data()
+            display.reset_display()
             display.draw_header()
+            display.draw_all_tickers(tickers)
             
-            for i, ticker in enumerate(tickers):
-                display.draw_ticker(
-                    position=(10, 45 + i * 55),
-                    symbol=str(ticker["symbol"]),
-                    price=float(ticker["price"]),
-                    change=float(ticker["change"]),
-                    volume=float(ticker["volume"])
-                )
-            
-            display.update_display()
+            #display.update_display()
             five_min = 60 * 5
             time.sleep(five_min)
     except KeyboardInterrupt:
