@@ -84,9 +84,9 @@ class TickerDisplay:
     def draw_header(self) -> None:
         """Draw the header section with title and current time."""
         current_time = datetime.now().strftime("%H:%M:%S")
-        self.draw.text((10, 5), "Crypto & Stock Tracker", 
+        self.draw.text((10, 5), "Crypto Tracker", 
                       font=self.medium_font, fill=self.WHITE)
-        self.draw.text((self.width - 100, 5), current_time, 
+        self.draw.text((self.width - 210, 5), f"Updated: {current_time}", 
                       font=self.medium_font, fill=self.WHITE)
         self.draw.line((10, 35, self.width - 10, 35), fill=self.GRAY)
 
