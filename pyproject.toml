@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "crypto-pi"
+version = "0.1.0"
+description = ""
+authors = ["Joshua Faust"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pillow = "^11.0.0"
+numpy = "^2.2.1"
+requests = "^2.32.3"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
