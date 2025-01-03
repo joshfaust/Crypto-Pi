@@ -31,4 +31,4 @@ ignore_lcd=1
 
 ## Pi Frame
 
-If you're curious about the frame I have around the Pi and screen, I've published the cd model [here](https://makerworld.com/en/models/943780#profileId-909957). 
+If you're curious about the frame I have around the Pi and screen, I've published the 3d model [here](https://makerworld.com/en/models/943780#profileId-909957). 
