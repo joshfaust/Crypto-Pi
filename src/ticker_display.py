@@ -1,9 +1,8 @@
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
-import os, time
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
-from pathlib import Path
+import time
 from src.ticker_icons import TickerIcons
 
 class TickerDisplay:
@@ -18,10 +17,6 @@ class TickerDisplay:
         self.image = Image.new('RGB', (width, height), 'black')
         self.draw = ImageDraw.Draw(self.image)
         self.icons = TickerIcons(32)  # 32px icons
-        self.back_buffer = Image.new('RGB', (width, height), 'black')
-        self.front_buffer = Image.new('RGB', (width, height), 'black')
-        self.draw = ImageDraw.Draw(self.back_buffer)
-        self.current_buffer = self.back_buffer
         
         # Load fonts
         try:
@@ -39,45 +34,15 @@ class TickerDisplay:
         self.WHITE = '#FFFFFF'
         self.GRAY = '#808080'
 
-    def reset_display(self) -> None:
-        """Completely reset both buffers and redraw from scratch."""
-        self.back_buffer = Image.new('RGB', (self.width, self.height), 'black')
-        self.front_buffer = Image.new('RGB', (self.width, self.height), 'black')
-        self.draw = ImageDraw.Draw(self.back_buffer)
-        self.current_buffer = self.back_buffer
-
-    def swap_buffers(self) -> None:
-        """Swap the front and back buffers with verification."""
-        try:
-            # Ensure all drawing operations are complete
-            self.back_buffer.load()
-            self.front_buffer.load()
-            
-            # Swap buffers
-            self.front_buffer, self.back_buffer = self.back_buffer, self.front_buffer
-            self.draw = ImageDraw.Draw(self.back_buffer)
-            self.current_buffer = self.back_buffer
-            
-        except Exception as e:
-            print(f"Error during buffer swap: {e}")
-            # Reset on error
-            self.reset_display()
-
     def clear(self) -> None:
         """Clear the display by filling it with black."""
         self.draw.rectangle([0, 0, self.width, self.height], fill='black')
 
     def update_display(self) -> None:
-        """Update the display with the current frame."""
+        """Convert the current image to RGB565 format and write to the framebuffer device."""
         try:
-            # Ensure back buffer is fully rendered
-            self.back_buffer.load()
-            
-            # Swap buffers
-            self.swap_buffers()
-            
-            # Convert the front buffer to RGB565
-            rgb_image = self.front_buffer.convert('RGB')
+            # Convert to RGB565
+            rgb_image = self.image.convert('RGB')
             pixels = np.array(rgb_image)
             
             # Convert RGB888 to RGB565
@@ -86,21 +51,24 @@ class TickerDisplay:
             b = (pixels[..., 2] >> 3).astype(np.uint16)
             rgb565 = r | g | b
             
-            # Prepare complete frame
+            # Get frame data
             frame_data = rgb565.tobytes()
             
-            # Write to framebuffer in a single operation
+            # Write in chunks matching hardware buffer (4KB)
+            buffer_size = 4096
             with open(self.fb_device, 'wb') as fb:
-                fb.write(frame_data)
-                fb.flush()
-                os.fsync(fb.fileno())
+                for i in range(0, len(frame_data), buffer_size):
+                    chunk = frame_data[i:i + buffer_size]
+                    fb.write(chunk)
+                    fb.flush()
+                    # Small delay between chunks to match hardware timing
+                    time.sleep(0.0005)  # 0.5ms delay
                 
-            # Small delay to ensure frame is written
-            time.sleep(0.05)
-            
+                # Final flush to ensure all data is written
+                fb.flush()
+                
         except Exception as e:
             print(f"Error updating display: {e}")
-            self.reset_display()
 
     @staticmethod
     def format_price(price: float) -> str:
@@ -140,35 +108,6 @@ class TickerDisplay:
                       font=self.medium_font, fill=self.WHITE)
         self.draw.line((10, 35, self.width - 10, 35), fill=self.GRAY)
 
-    def draw_all_tickers(self, tickers: List[Dict]) -> None:
-        """Draw all tickers with improved error handling."""
-        try:
-            # Reset buffers before drawing new frame
-            self.clear()
-            
-            # Draw header
-            self.draw_header()
-            
-            # Draw each ticker
-            for i, ticker in enumerate(tickers):
-                self.draw_ticker(
-                    position=(10, 45 + i * 55),
-                    symbol=str(ticker["symbol"]),
-                    price=float(ticker["price"]),
-                    change=float(ticker["change"]),
-                    volume=float(ticker["volume"])
-                )
-            
-            # Ensure drawing is complete
-            self.back_buffer.load()
-            
-            # Update display
-            self.update_display()
-            
-        except Exception as e:
-            print(f"Error in draw_all_tickers: {e}")
-            self.reset_display()
-
     def draw_ticker(self, position: Tuple[int, int], symbol: str, price: float, 
                    change: float, volume: Optional[float] = None) -> None:
         """Draw a single ticker with all its information and icon."""
@@ -180,13 +119,14 @@ class TickerDisplay:
         self.draw.rectangle([x, y, x + box_width, y + box_height], 
                           outline=self.GRAY, width=1)
         
-        # Load and draw icon
-        icon = self.icons.load_icon(symbol) or self.icons.draw_vector_icon(symbol)
+        # Try to load icon
+        icon = self.icons.load_icon(symbol, icons_dir=self.icons_dir) or self.icons.draw_vector_icon(symbol)
         if icon:
+            # Calculate icon position (centered vertically in box)
             icon_y = y + (box_height - icon.height) // 2
-            # Paste to the current buffer instead of self.image
-            self.current_buffer.paste(icon, (x + 10, icon_y), icon)
-            symbol_x = x + 50
+            # Paste icon with alpha channel
+            self.image.paste(icon, (x + 10, icon_y), icon)
+            symbol_x = x + 50  # Move symbol text after icon
         else:
             symbol_x = x + 10
         
